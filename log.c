@@ -1153,7 +1153,7 @@ log_content_file_single_prepcb(void *fh, unsigned long prepflags,
 		return NULL;
 	}
 
-	lb->sz = strftime((char*)lb->buf, lb->sz, "%Y-%m-%d %H:%M:%S UTC ",
+	lb->sz = strftime((char*)lb->buf, lb->sz, "\n%Y-%m-%d %H:%M:%S UTC ",
 	                  utc);
 
 out:
