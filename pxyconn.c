@@ -1699,7 +1699,7 @@ pxy_conn_autossl_peek_and_upgrade(pxy_conn_ctx_t *ctx)
 	}
 	/* peek the buffer */
 	inbuf = bufferevent_get_input(ctx->src.bev);
-	if (evbuffer_peek(inbuf, 1024, 0, vec_out, 1)) {
+	if (evbuffer_peek(inbuf, 4096, 0, vec_out, 1)) {
 		if (ssl_tls_clienthello_parse(vec_out[0].iov_base,
 		                              vec_out[0].iov_len,
 		                              0, &chello, &ctx->sni) == 0) {
@@ -1819,13 +1819,13 @@ pxy_bev_readcb(struct bufferevent *bev, void *arg)
 				add_line_to_content_log(line, &lb, &tail);
 			}
 			replace = pxy_http_reqhdr_filter_line(line, ctx);
-			if (replace == line) {
-				evbuffer_add_printf(outbuf, "%s\r\n", line);
-			} else if (replace) {
+			if (replace != line) {
+				free(line);
+			}
+			if (replace) {
 				evbuffer_add_printf(outbuf, "%s\r\n", replace);
 				free(replace);
 			}
-			free(line);
 			if (ctx->seen_req_header) {
 				/* request header complete */
 				if (ctx->opts->deny_ocsp) {
@@ -2479,7 +2479,7 @@ pxy_fd_readcb(MAYBE_UNUSED evutil_socket_t fd, UNUSED short what, void *arg)
 #ifndef OPENSSL_NO_TLSEXT
 	/* for SSL, peek ClientHello and parse SNI from it */
 	if (ctx->spec->ssl && !ctx->passthrough /*&& ctx->ev*/) {
-		unsigned char buf[1024];
+		unsigned char buf[4096];
 		ssize_t n;
 		const unsigned char *chello;
 		int rv;

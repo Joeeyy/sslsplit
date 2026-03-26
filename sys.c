@@ -38,7 +38,6 @@
 #include <sys/stat.h>
 #include <sys/file.h>
 #include <sys/un.h>
-#include <sys/time.h>
 #include <net/if.h>
 #include <netinet/in.h>
 #include <netdb.h>
@@ -50,6 +49,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 #include <errno.h>
 
 #ifndef _SC_NPROCESSORS_ONLN
@@ -470,34 +470,30 @@ sys_sockaddr_str(struct sockaddr *addr, socklen_t addrlen,
                  char **host, char **serv)
 {
 	char tmphost[INET6_ADDRSTRLEN];
+	char tmpserv[6]; /* max decimal digits of short plus terminator */
 	int rv;
-	size_t hostsz;
 
-	*serv = malloc(6); /* max decimal digits of short plus terminator */
-	if (!*serv) {
-		log_err_printf("Cannot allocate memory\n");
-		return -1;
-	}
 	rv = getnameinfo(addr, addrlen,
 	                 tmphost, sizeof(tmphost),
-	                 *serv, 6,
+	                 tmpserv, sizeof(tmpserv),
 	                 NI_NUMERICHOST | NI_NUMERICSERV);
 	if (rv != 0) {
 		log_err_printf("Cannot get nameinfo for socket address: %s\n",
 		               gai_strerror(rv));
-		free(*serv);
-		*serv = NULL;
 		return -1;
 	}
-	hostsz = strlen(tmphost) + 1; /* including terminator */
-	*host = malloc(hostsz);
+	*serv = strdup(tmpserv);
+	if (!*serv) {
+		log_err_printf("Cannot allocate memory\n");
+		return -1;
+	}
+	*host = strdup(tmphost);
 	if (!*host) {
 		log_err_printf("Cannot allocate memory\n");
 		free(*serv);
 		*serv = NULL;
 		return -1;
 	}
-	memcpy(*host, tmphost, hostsz);
 	return 0;
 }
 
@@ -1019,12 +1015,12 @@ static int sys_rand_seeded = 0;
 
 static void
 sys_rand_seed(void) {
-	struct timeval seed;
+	struct timespec seed;
 
-	if (gettimeofday(&seed, NULL) == -1) {
+	if (clock_gettime(CLOCK_REALTIME, &seed) == -1) {
 		srandom((unsigned)time(NULL));
 	} else {
-		srandom((unsigned)(seed.tv_sec ^ seed.tv_usec));
+		srandom((unsigned)(seed.tv_sec ^ seed.tv_nsec));
 	}
 	sys_rand_seeded = 1;
 }
