@@ -144,6 +144,7 @@ typedef struct pxy_conn_ctx {
 	unsigned int seen_resp_header : 1;  /* 0 until response hdr complete */
 	unsigned int sent_http_conn_close : 1;   /* 0 until Conn: close sent */
 	unsigned int ocsp_denied : 1;                /* 1 if OCSP was denied */
+	unsigned int detected_http : 1;  /* 1 if HTTP detected at runtime */
 	/* autossl */
 	unsigned int clienthello_search : 1;       /* 1 if waiting for hello */
 	unsigned int clienthello_found : 1;      /* 1 if conn upgrade to SSL */
@@ -204,9 +205,9 @@ typedef struct pxy_conn_ctx {
 
 #define WANT_CONNECT_LOG(ctx)	((ctx)->opts->connectlog||!(ctx)->opts->detach)
 #ifndef WITHOUT_MIRROR
-#define WANT_CONTENT_LOG(ctx)	(((ctx)->opts->contentlog||(ctx)->opts->pcaplog||(ctx)->opts->mirrorif)&&!(ctx)->passthrough)
+#define WANT_CONTENT_LOG(ctx)	(((ctx)->opts->contentlog||(ctx)->opts->pcaplog||(ctx)->opts->mirrorif)&&!(ctx)->passthrough&&!((ctx)->opts->no_http_contentlog&&((ctx)->spec->http||(ctx)->detected_http)))
 #else /* WITHOUT_MIRROR */
-#define WANT_CONTENT_LOG(ctx)	(((ctx)->opts->contentlog||(ctx)->opts->pcaplog)&&!(ctx)->passthrough)
+#define WANT_CONTENT_LOG(ctx)	(((ctx)->opts->contentlog||(ctx)->opts->pcaplog)&&!(ctx)->passthrough&&!((ctx)->opts->no_http_contentlog&&((ctx)->spec->http||(ctx)->detected_http)))
 #endif /* WITHOUT_MIRROR */
 
 static void
@@ -1883,6 +1884,34 @@ pxy_bev_readcb(struct bufferevent *bev, void *arg)
 	/* no data left after parsing headers? */
 	if (evbuffer_get_length(inbuf) == 0)
 		return;
+
+	/* Detect HTTP traffic at runtime for non-http proxyspecs */
+	if (ctx->opts->no_http_contentlog && !ctx->spec->http &&
+	    !ctx->detected_http) {
+		size_t sz = evbuffer_get_length(inbuf);
+		if (sz >= 4) {
+			unsigned char peek[8];
+			size_t peeksz = (sz < sizeof(peek)) ? sz : sizeof(peek);
+			if (evbuffer_copyout(inbuf, peek, peeksz) != -1) {
+				if ((peeksz >= 5 && !memcmp(peek, "HTTP/", 5)) ||
+				    (peeksz >= 4 && (!memcmp(peek, "GET ", 4) ||
+				                     !memcmp(peek, "PUT ", 4))) ||
+				    (peeksz >= 5 && (!memcmp(peek, "POST ", 5) ||
+				                     !memcmp(peek, "HEAD ", 5))) ||
+				    (peeksz >= 7 && !memcmp(peek, "DELETE ", 7)) ||
+				    (peeksz >= 8 && !memcmp(peek, "OPTIONS ", 8)) ||
+				    (peeksz >= 8 && !memcmp(peek, "CONNECT ", 8))) {
+					ctx->detected_http = 1;
+					if (log_content_close(&ctx->logctx, 1)
+					    == -1) {
+						log_err_printf("Warning: "
+						    "Content log "
+						    "close failed\n");
+					}
+				}
+			}
+		}
+	}
 
 	if (WANT_CONTENT_LOG(ctx)) {
 		logbuf_t *lb;

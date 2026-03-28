@@ -82,6 +82,7 @@ typedef struct opts {
 #ifdef HAVE_LOCAL_PROCINFO
 	unsigned int lprocinfo : 1;
 #endif /* HAVE_LOCAL_PROCINFO */
+	unsigned int no_http_contentlog : 1;
 	unsigned int certgen_writeall : 1;
 #ifndef OPENSSL_NO_ENGINE
 	char *openssl_engine;
@@ -155,6 +156,8 @@ void opts_set_certgendir_writegencerts(opts_t *, const char *, const char *)
      NONNULL(1,2,3);
 void opts_set_deny_ocsp(opts_t *) NONNULL(1);
 void opts_set_passthrough(opts_t *) NONNULL(1);
+void opts_set_no_http_contentlog(opts_t *) NONNULL(1);
+void opts_unset_no_http_contentlog(opts_t *) NONNULL(1);
 void opts_set_clientcrt(opts_t *, const char *, const char *) NONNULL(1,2,3);
 void opts_set_clientkey(opts_t *, const char *, const char *) NONNULL(1,2,3);
 #ifndef OPENSSL_NO_DH

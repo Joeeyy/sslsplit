@@ -729,6 +729,18 @@ opts_unset_passthrough(opts_t *opts)
 }
 
 void
+opts_set_no_http_contentlog(opts_t *opts)
+{
+	opts->no_http_contentlog = 1;
+}
+
+void
+opts_unset_no_http_contentlog(opts_t *opts)
+{
+	opts->no_http_contentlog = 0;
+}
+
+void
 opts_set_clientcrt(opts_t *opts, const char *argv0, const char *optarg)
 {
 	if (opts->clientcrt)
@@ -1421,6 +1433,17 @@ set_option(opts_t *opts, const char *argv0,
 		yes ? opts_set_passthrough(opts) : opts_unset_passthrough(opts);
 #ifdef DEBUG_OPTS
 		log_dbg_printf("Passthrough: %u\n", opts->passthrough);
+#endif /* DEBUG_OPTS */
+	} else if (!strcmp(name, "NoHTTPContentLog")) {
+		yes = check_value_yesno(value, "NoHTTPContentLog", line_num);
+		if (yes == -1) {
+			goto leave;
+		}
+		yes ? opts_set_no_http_contentlog(opts)
+		    : opts_unset_no_http_contentlog(opts);
+#ifdef DEBUG_OPTS
+		log_dbg_printf("NoHTTPContentLog: %u\n",
+		               opts->no_http_contentlog);
 #endif /* DEBUG_OPTS */
 #ifndef OPENSSL_NO_DH
 	} else if (!strcmp(name, "DHGroupParams")) {

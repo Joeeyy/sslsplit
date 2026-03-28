@@ -53,7 +53,13 @@ CAKey /usr/local/etc/sslsplit/ca.key
 # Equivalent to -O command line option.
 #DenyOCSP yes
 
-# Passthrough SSL connections if they cannot be split because of client cert 
+# Do not write content log for HTTP and HTTPS connections.
+# Only non-HTTP protocols (plain TCP, SSL) will be content-logged.
+# Equivalent to -N command line option.
+# (default: no)
+#NoHTTPContentLog yes
+
+# Passthrough SSL connections if they cannot be split because of client cert
 # auth or no matching cert and no CA.
 # Equivalent to -P command line option.
 # (default: drop)
