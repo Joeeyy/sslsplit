@@ -59,6 +59,12 @@ CAKey /usr/local/etc/sslsplit/ca.key
 # (default: no)
 #NoHTTPContentLog yes
 
+# Only write content log for connections detected as LWP protocol.
+# All other protocols (HTTP, HTTPS, plain TCP, etc.) will not be logged.
+# Equivalent to -B command line option.
+# (default: no)
+#LWPContentLogOnly yes
+
 # Passthrough SSL connections if they cannot be split because of client cert
 # auth or no matching cert and no CA.
 # Equivalent to -P command line option.

@@ -278,6 +278,11 @@ When this option is used, only non-HTTP protocols (such as plain TCP and SSL)
 will have their content logged via \fB-S\fP, \fB-L\fP or \fB-F\fP.
 This is useful when you only want to capture non-HTTP protocol traffic.
 .TP
+.B \-B
+Only write content log data for connections detected as LWP protocol.
+All other protocols (HTTP, HTTPS, plain TCP, etc.) will not be content-logged.
+LWP is detected by checking if the first client request starts with "LWP ".
+.TP
 .B \-P
 Passthrough SSL/TLS connections which cannot be split instead of dropping them.
 Connections cannot be split if \fB-c\fP and \fB-k\fP are not given and the

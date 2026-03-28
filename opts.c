@@ -741,6 +741,18 @@ opts_unset_no_http_contentlog(opts_t *opts)
 }
 
 void
+opts_set_lwp_contentlog_only(opts_t *opts)
+{
+	opts->lwp_contentlog_only = 1;
+}
+
+void
+opts_unset_lwp_contentlog_only(opts_t *opts)
+{
+	opts->lwp_contentlog_only = 0;
+}
+
+void
 opts_set_clientcrt(opts_t *opts, const char *argv0, const char *optarg)
 {
 	if (opts->clientcrt)
@@ -1444,6 +1456,17 @@ set_option(opts_t *opts, const char *argv0,
 #ifdef DEBUG_OPTS
 		log_dbg_printf("NoHTTPContentLog: %u\n",
 		               opts->no_http_contentlog);
+#endif /* DEBUG_OPTS */
+	} else if (!strcmp(name, "LWPContentLogOnly")) {
+		yes = check_value_yesno(value, "LWPContentLogOnly", line_num);
+		if (yes == -1) {
+			goto leave;
+		}
+		yes ? opts_set_lwp_contentlog_only(opts)
+		    : opts_unset_lwp_contentlog_only(opts);
+#ifdef DEBUG_OPTS
+		log_dbg_printf("LWPContentLogOnly: %u\n",
+		               opts->lwp_contentlog_only);
 #endif /* DEBUG_OPTS */
 #ifndef OPENSSL_NO_DH
 	} else if (!strcmp(name, "DHGroupParams")) {

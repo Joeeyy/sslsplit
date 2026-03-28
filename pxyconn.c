@@ -145,6 +145,7 @@ typedef struct pxy_conn_ctx {
 	unsigned int sent_http_conn_close : 1;   /* 0 until Conn: close sent */
 	unsigned int ocsp_denied : 1;                /* 1 if OCSP was denied */
 	unsigned int detected_http : 1;  /* 1 if HTTP detected at runtime */
+	unsigned int detected_lwp : 1;   /* 1 if LWP detected at runtime */
 	/* autossl */
 	unsigned int clienthello_search : 1;       /* 1 if waiting for hello */
 	unsigned int clienthello_found : 1;      /* 1 if conn upgrade to SSL */
@@ -205,9 +206,9 @@ typedef struct pxy_conn_ctx {
 
 #define WANT_CONNECT_LOG(ctx)	((ctx)->opts->connectlog||!(ctx)->opts->detach)
 #ifndef WITHOUT_MIRROR
-#define WANT_CONTENT_LOG(ctx)	(((ctx)->opts->contentlog||(ctx)->opts->pcaplog||(ctx)->opts->mirrorif)&&!(ctx)->passthrough&&!((ctx)->opts->no_http_contentlog&&((ctx)->spec->http||(ctx)->detected_http)))
+#define WANT_CONTENT_LOG(ctx)	(((ctx)->opts->contentlog||(ctx)->opts->pcaplog||(ctx)->opts->mirrorif)&&!(ctx)->passthrough&&!((ctx)->opts->no_http_contentlog&&((ctx)->spec->http||(ctx)->detected_http))&&!((ctx)->opts->lwp_contentlog_only&&!(ctx)->detected_lwp))
 #else /* WITHOUT_MIRROR */
-#define WANT_CONTENT_LOG(ctx)	(((ctx)->opts->contentlog||(ctx)->opts->pcaplog)&&!(ctx)->passthrough&&!((ctx)->opts->no_http_contentlog&&((ctx)->spec->http||(ctx)->detected_http)))
+#define WANT_CONTENT_LOG(ctx)	(((ctx)->opts->contentlog||(ctx)->opts->pcaplog)&&!(ctx)->passthrough&&!((ctx)->opts->no_http_contentlog&&((ctx)->spec->http||(ctx)->detected_http))&&!((ctx)->opts->lwp_contentlog_only&&!(ctx)->detected_lwp))
 #endif /* WITHOUT_MIRROR */
 
 static void
@@ -1885,28 +1886,69 @@ pxy_bev_readcb(struct bufferevent *bev, void *arg)
 	if (evbuffer_get_length(inbuf) == 0)
 		return;
 
-	/* Detect HTTP traffic at runtime for non-http proxyspecs */
-	if (ctx->opts->no_http_contentlog && !ctx->spec->http &&
-	    !ctx->detected_http) {
+	/* Detect protocol at runtime for non-http proxyspecs */
+	if (!ctx->spec->http && !ctx->detected_http &&
+	    !ctx->detected_lwp &&
+	    (ctx->opts->no_http_contentlog ||
+	     ctx->opts->lwp_contentlog_only) &&
+	    bev == ctx->src.bev) {
 		size_t sz = evbuffer_get_length(inbuf);
 		if (sz >= 4) {
 			unsigned char peek[8];
 			size_t peeksz = (sz < sizeof(peek)) ? sz : sizeof(peek);
 			if (evbuffer_copyout(inbuf, peek, peeksz) != -1) {
-				if ((peeksz >= 5 && !memcmp(peek, "HTTP/", 5)) ||
+				if (peeksz >= 4 &&
+				    !memcmp(peek, "LWP ", 4)) {
+					ctx->detected_lwp = 1;
+					/* -B: log was not opened at
+					 * connection time, open it now */
+					if (ctx->opts->lwp_contentlog_only &&
+					    !ctx->logctx.file) {
+						if (log_content_open(
+						    &ctx->logctx, ctx->opts,
+						    (struct sockaddr *)&ctx->srcaddr,
+						    ctx->srcaddrlen,
+						    (struct sockaddr *)&ctx->dstaddr,
+						    ctx->dstaddrlen,
+						    ctx->srchost_str,
+						    ctx->srcport_str,
+						    ctx->dsthost_str,
+						    ctx->dstport_str,
+#ifdef HAVE_LOCAL_PROCINFO
+						    ctx->lproc.exec_path,
+						    ctx->lproc.user,
+						    ctx->lproc.group
+#else
+						    NULL, NULL, NULL
+#endif
+						    ) == -1) {
+							log_err_printf(
+							    "Warning: "
+							    "Content log "
+							    "open failed\n");
+						}
+					}
+				} else if (
+				    (peeksz >= 5 && !memcmp(peek, "HTTP/", 5)) ||
 				    (peeksz >= 4 && (!memcmp(peek, "GET ", 4) ||
 				                     !memcmp(peek, "PUT ", 4))) ||
 				    (peeksz >= 5 && (!memcmp(peek, "POST ", 5) ||
 				                     !memcmp(peek, "HEAD ", 5))) ||
 				    (peeksz >= 7 && !memcmp(peek, "DELETE ", 7)) ||
-				    (peeksz >= 8 && !memcmp(peek, "OPTIONS ", 8)) ||
-				    (peeksz >= 8 && !memcmp(peek, "CONNECT ", 8))) {
+				    (peeksz >= 8 && (!memcmp(peek, "OPTIONS ", 8) ||
+				                     !memcmp(peek, "CONNECT ", 8)))) {
 					ctx->detected_http = 1;
-					if (log_content_close(&ctx->logctx, 1)
-					    == -1) {
-						log_err_printf("Warning: "
-						    "Content log "
-						    "close failed\n");
+					/* -N: close log opened at
+					 * connection time */
+					if (ctx->opts->no_http_contentlog &&
+					    ctx->logctx.file) {
+						if (log_content_close(
+						    &ctx->logctx, 1) == -1) {
+							log_err_printf(
+							    "Warning: "
+							    "Content log "
+							    "close failed\n");
+						}
 					}
 				}
 			}

@@ -161,6 +161,7 @@ main_usage(void)
 "  -O          deny all OCSP requests on all proxyspecs\n"
 "  -N          no content log for HTTP and HTTPS connections (log only\n"
 "              non-HTTP protocols such as plain TCP and SSL)\n"
+"  -B          only content log LWP protocol connections\n"
 "  -P          passthrough SSL connections if they cannot be split because of\n"
 "              client cert auth or no matching cert and no CA (default: drop)\n"
 "  -a pemfile  use cert from pemfile when destination requests client certs\n"
@@ -333,7 +334,7 @@ main(int argc, char *argv[])
 
 	while ((ch = getopt(argc, argv,
 	                    OPT_g OPT_G OPT_Z OPT_i OPT_x OPT_T OPT_I
-	                    "k:c:C:K:t:A:ONPa:b:s:r:R:e:Eu:m:j:p:l:L:S:F:M:"
+	                    "k:c:C:K:t:A:ONBPa:b:s:r:R:e:Eu:m:j:p:l:L:S:F:M:"
 	                    "dDVhW:w:q:f:o:X:Y:y:")) != -1) {
 		switch (ch) {
 			case 'f':
@@ -377,6 +378,9 @@ main(int argc, char *argv[])
 				break;
 			case 'N':
 				opts_set_no_http_contentlog(opts);
+				break;
+			case 'B':
+				opts_set_lwp_contentlog_only(opts);
 				break;
 			case 'O':
 				opts_set_deny_ocsp(opts);
